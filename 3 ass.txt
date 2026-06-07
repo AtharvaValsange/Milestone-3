@@ -1,0 +1,249 @@
+nani: https://github.com/nanineelapu/MILESTONE-3-GUIDE.git
+
+eccomerce git link: https://github.com/AtharvaValsange/EcommerceApp.git
+maven git link: https://github.com/AtharvaValsange/maven-web-application.git
+
+jenkins:  admin  Admin@123
+
+
+sonarqube:  admin  Admin@123
+
+
+App-server vr run karycha 
+systemctl daemon-reload
+systemctl restart tomcat
+systemctl status tomcat
+
+jenkins-server:
+sudo systemctl restart jenkins
+sudo systemctl status jenkins
+
+
+========================================================
+eccomerce-deploy.yml:
+---
+- name: Deploy Ecommerce App to Tomcat
+  hosts: appserver
+  become: yes
+  tasks:
+
+    - name: Stop Tomcat
+      systemd:
+        name: tomcat
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove old deployment
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/tomcat/webapps/ROOT
+        - /opt/tomcat/webapps/ROOT.war
+        - /opt/tomcat/webapps/EcommerceApp
+        - /opt/tomcat/webapps/EcommerceApp.war
+
+    - name: Copy WAR to Tomcat
+      copy:
+        src: /var/lib/jenkins/workspace/EcommerceApp/EcommerceApp/target/EcommerceApp.war
+        dest: /opt/tomcat/webapps/ROOT.war
+        mode: '0644'
+
+    - name: Start Tomcat
+      systemd:
+        name: tomcat
+        state: started
+
+    - name: Wait for port 8080
+      wait_for:
+        port: 8080
+        delay: 10
+        timeout: 60
+
+======================================================
+sudo nano /etc/ansible/deploy-maven.yml
+maven-deploy.yml:
+---
+- name: Deploy Maven Web Application
+  hosts: appserver
+  become: yes
+
+  tasks:
+
+    - name: Stop Tomcat
+      shell: /opt/tomcat/bin/shutdown.sh
+      ignore_errors: yes
+
+    - name: Remove old deployment
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/tomcat/webapps/ROOT
+        - /opt/tomcat/webapps/ROOT.war
+
+    - name: Copy WAR to Tomcat
+      copy:
+        src: /var/lib/jenkins/workspace/MavenWebApp/target/maven-web-application.war
+        dest: /opt/tomcat/webapps/ROOT.war
+        mode: '0644'
+
+    - name: Start Tomcat
+      shell: /opt/tomcat/bin/startup.sh
+
+    - name: Wait for port 8080
+      wait_for:
+        port: 8080
+        delay: 10
+        timeout: 60
+==========================================================
+eccomerce-jenkinfile:
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven'
+    }
+
+    stages {
+
+        stage('1. Clone Source Code') {
+            steps {
+                git branch: 'master',
+                    url: 'https://github.com/AtharvaValsange/EcommerceApp.git'
+            }
+        }
+
+        stage('2. SonarQube Code Quality') {
+            steps {
+                dir('EcommerceApp') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=EcommerceApp -DskipTests'
+                    }
+                }
+            }
+        }
+
+        stage('3. Quality Gate Check') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('4. Maven Build') {
+            steps {
+                dir('EcommerceApp') {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('5. Ansible Deploy') {
+            steps {
+                sh 'ansible-playbook -i /etc/ansible/hosts /etc/ansible/deploy.yml'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline SUCCESS - App deployed to Tomcat!'
+        }
+        failure {
+            echo 'Pipeline FAILED - Deployment stopped.'
+        }
+    }
+}
+=======================================================================
+maven-jenkinfile: 
+pipeline {
+    agent any
+    tools {
+        maven 'Maven'
+    }
+    stages {
+        stage('1. Clone Source Code') {
+            steps {
+                git branch: 'master',
+                    url: 'https://github.com/AtharvaValsange/maven-web-application.git'
+            }
+        }
+        stage('2. SonarQube Code Quality') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=maven-web-application -DskipTests'
+                }
+            }
+        }
+        stage('3. Quality Gate Check') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('4. Maven Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+        stage('5. Ansible Deploy') {
+            steps {
+                sh 'ansible-playbook -i /etc/ansible/hosts /etc/ansible/maven.yml'
+            }
+        }
+    }
+    post {
+        success {
+            echo 'Pipeline SUCCESS - Maven Web App deployed to Tomcat!'
+        }
+        failure {
+            echo 'Pipeline FAILED - Deployment stopped.'
+        }
+    }
+}
+============================================
+tomcat-server:
+nano /etc/systemd/system/tomcat.service
+[Unit]
+Description=Apache Tomcat
+After=network.target
+
+[Service]
+Type=forking
+
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto.x86_64
+Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
+Environment=CATALINA_HOME=/opt/tomcat
+Environment=CATALINA_BASE=/opt/tomcat
+
+ExecStart=/opt/tomcat/bin/startup.sh
+ExecStop=/opt/tomcat/bin/shutdown.sh
+
+User=root
+Group=root
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+
+=================================================
+administration - configuration create webhook
+sonarqube madhe token generate karne
+jenkin server give private ip while creating webhook
+
+
+hai step fakt maven-web satti
+pom.xml madhe 24th line give sonarcube publicip:9000
+remove password line
+25 th line login line madhe admin remove karun sonarqube key dene
+
+
+if we create new credientials in jenkin then add in system in jenkin add
+nantr jenkins vr new item and give jenkinfile and build now
+
+or follow step 9 from nanni repo
