@@ -9,10 +9,15 @@ jenkins:  admin  Admin@123
 sonarqube:  admin  Admin@123
 
 
-App-server vr run karycha 
+when we reopen putty of all instance after stopped
+
+App-server: vr run karycha  for tomcat 
 systemctl daemon-reload
 systemctl restart tomcat
 systemctl status tomcat
+
+sonarqube-server:
+run ./sonar.sh file
 
 jenkins-server:
 sudo systemctl restart jenkins
