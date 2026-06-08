@@ -252,3 +252,7 @@ if we create new credientials in jenkin then add in system in jenkin add
 nantr jenkins vr new item and give jenkinfile and build now
 
 or follow step 9 from nanni repo
+
+
+while exposing maven give infront \maven-web-application
+while exposing eccomerce keep public ip:9000 only
